@@ -1,38 +1,65 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
+import { useCallback, useState } from "react";
 import "./App.css";
 import VideoPlayer from "./components/VideoPlayer";
-import ImagePreviewWithModalAndPiP from "./components/ImagePreview";
+import FileViewerModal from "./components/FileViewerModal";
+import pdfMake from "pdfmake/build/pdfmake";
+import type { TDocumentDefinitions } from "pdfmake/interfaces";
+import pdfFonts from "pdfmake/build/vfs_fonts";
 
-const imageSrc =
-  "https://images.pexels.com/photos/1525041/pexels-photo-1525041.jpeg?cs=srgb&dl=pexels-francesco-ungaro-1525041.jpg&fm=jpg";
+pdfMake.vfs = pdfFonts.pdfMake.vfs;
 
 function App() {
-  const [count, setCount] = useState(0);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [pdfFile, setPdfFile] = useState<string | ArrayBuffer | null>(null);
+
+  const createImageFileFromURL = useCallback(
+    async (imageUrl: string, fileName: string = "example-image.png") => {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+
+      // Create a File object from the Blob
+      const imageFile = new File([blob], fileName, { type: blob.type });
+
+      setImageFile(imageFile);
+    },
+    []
+  );
+
+  const createPDFFile = useCallback((fileName: string = "example-pdf.pdf") => {
+    // Define the document structure
+    const docDefinition: TDocumentDefinitions = {
+      content: [
+        { text: "Page 1 Content", fontSize: 16 },
+
+        // Add a page break after this content
+        { text: "End of Page 1", pageBreak: "after" },
+
+        // Content for the second page
+        { text: "Page 2 Content", fontSize: 16 },
+
+        // Add another page break
+        { text: "End of Page 2", pageBreak: "after" },
+
+        // Content for the third page
+        { text: "Page 3 Content", fontSize: 16 },
+      ],
+    };
+
+    // Generate the PDF and get the Blob
+    pdfMake.createPdf(docDefinition).getBlob((blob) => {
+      // Convert the Blob to a File object
+      const file = new File([blob], fileName, { type: "application/pdf" });
+
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onloadend = (e) => {
+        setPdfFile(e?.target?.result ?? null);
+      };
+    });
+  }, []);
 
   return (
     <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
       <h1>Picture-in-Picture Demo</h1>
       <VideoPlayer
         controls
@@ -40,8 +67,23 @@ function App() {
         width="600"
       />
 
-      <h1>Image preview with modal and Pip</h1>
-      <ImagePreviewWithModalAndPiP imageSrc={imageSrc} />
+      <button
+        onClick={() =>
+          createImageFileFromURL(
+            "https://images.pexels.com/photos/1525041/pexels-photo-1525041.jpeg?cs=srgb&dl=pexels-francesco-ungaro-1525041.jpg&fm=jpg"
+          )
+        }
+        style={{
+          marginTop: "50px",
+        }}
+      >
+        Generate Image File
+      </button>
+
+      <button onClick={() => createPDFFile()}>Generate PDF File</button>
+
+      {imageFile && <FileViewerModal file={imageFile} />}
+      {pdfFile && <FileViewerModal file={String(pdfFile)} />}
     </>
   );
 }

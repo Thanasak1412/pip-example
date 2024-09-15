@@ -1,14 +1,24 @@
 import { ChangeEvent, useState } from "react";
 import Draggable from "react-draggable";
 import Modal from "react-modal";
+import { Worker, Viewer } from "@react-pdf-viewer/core";
+// Import the styles
+import "@react-pdf-viewer/core/lib/styles/index.css";
+// default layout plugin
+import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
+// Import styles of default layout plugin
+import "@react-pdf-viewer/default-layout/lib/styles/index.css";
 
 Modal.setAppElement("#root"); // This is required for accessibility
 
 type Props = {
-  imageSrc: string;
+  file: File | string;
 };
 
-const ImagePreviewWithModalAndPiP = ({ imageSrc }: Readonly<Props>) => {
+export default function FileViewerModal({ file }: Readonly<Props>) {
+  // Create new plugin instance (called inside of the body of a function component)
+  const defaultLayoutPluginInstance = defaultLayoutPlugin();
+
   const [modalIsOpen, setModalIsOpen] = useState(false);
 
   const [isMinimized, setIsMinimized] = useState(false);
@@ -40,7 +50,7 @@ const ImagePreviewWithModalAndPiP = ({ imageSrc }: Readonly<Props>) => {
   const openInNewTab = () => {
     const newWindow = window.open();
 
-    if (newWindow) {
+    if (newWindow && typeof file !== "string") {
       newWindow.document.write(`
         <html>
           <head>
@@ -52,7 +62,9 @@ const ImagePreviewWithModalAndPiP = ({ imageSrc }: Readonly<Props>) => {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                background: url('${imageSrc}') no-repeat center center fixed;
+                background: url('${URL.createObjectURL(
+                  file
+                )}') no-repeat center center fixed;
                 background-size: cover;
               }
             </style>
@@ -67,6 +79,53 @@ const ImagePreviewWithModalAndPiP = ({ imageSrc }: Readonly<Props>) => {
 
   const handleZoomChange = (e: ChangeEvent<HTMLInputElement>) => {
     setZoomLevel(Number(e.target.value));
+  };
+
+  // Render content based on file type
+  const renderFileContent = () => {
+    if (typeof file !== "string" && file?.type.startsWith("image/")) {
+      // Image rendering
+      return (
+        <div
+          style={{
+            overflow: "hidden",
+            width: "100%",
+            height: "auto",
+            textAlign: "center",
+          }}
+        >
+          <img
+            src={URL.createObjectURL(file)}
+            alt="Preview"
+            style={{
+              transform: `scale(${zoomLevel})`,
+              transition: "transform 0.3s ease",
+              maxWidth: "100%",
+              maxHeight: "80vh",
+              display: "block",
+              margin: "0 auto",
+            }}
+          />
+        </div>
+      );
+    } else if (typeof file === "string") {
+      // PDF rendering using react-pdf-viewer
+      return (
+        <div
+          style={{
+            width: "100%",
+            height: "80vh",
+            overflow: "auto",
+          }}
+        >
+          <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
+            <Viewer fileUrl={file} plugins={[defaultLayoutPluginInstance]} />
+          </Worker>
+        </div>
+      );
+    } else {
+      return <p>Unsupported file type: {file?.type}</p>;
+    }
   };
 
   return (
@@ -92,45 +151,28 @@ const ImagePreviewWithModalAndPiP = ({ imageSrc }: Readonly<Props>) => {
           },
         }}
       >
-        {/* Image Container with Zoom Effect */}
-        <div
-          style={{
-            overflow: "hidden",
-            width: "100%",
-            height: "auto",
-            textAlign: "center",
-          }}
-        >
-          <img
-            src={imageSrc}
-            alt="Preview"
-            style={{
-              transform: `scale(${zoomLevel})`,
-              transition: "transform 0.3s ease",
-              maxWidth: "100%",
-              maxHeight: "80vh",
-              display: "block",
-              margin: "0 auto",
-            }}
-          />
-        </div>
+        {/* File content (image, PDF) */}
+        {renderFileContent()}
 
-        {/* Zoom slider */}
-        <div style={{ marginTop: "10px", textAlign: "center" }}>
-          <label htmlFor="zoom-previewed-image" style={{ color: "black" }}>
-            Zoom:{" "}
-          </label>
-          <input
-            id="zoom-previewed-image"
-            type="range"
-            min="1"
-            max="3"
-            step="0.1"
-            value={zoomLevel}
-            onChange={handleZoomChange}
-            style={{ width: "50%" }}
-          />
-        </div>
+        {/* If image, show zoom slider */}
+        {typeof file !== "string" && file?.type.startsWith("image/") && (
+          // Zoom slide
+          <div style={{ marginTop: "10px", textAlign: "center" }}>
+            <label htmlFor="zoom-previewed-image" style={{ color: "black" }}>
+              Zoom:
+            </label>
+            <input
+              id="zoom-previewed-image"
+              type="range"
+              min="1"
+              max="3"
+              step="0.1"
+              value={zoomLevel}
+              onChange={handleZoomChange}
+              style={{ width: "50%" }}
+            />
+          </div>
+        )}
 
         {/* Minimize Button */}
         <button onClick={minimizeModal} style={{ marginTop: "10px" }}>
@@ -151,7 +193,7 @@ const ImagePreviewWithModalAndPiP = ({ imageSrc }: Readonly<Props>) => {
       {/* Draggable minimized thumbnail when minimized */}
       {isMinimized && (
         <Draggable>
-          <div
+          <div // NOSONAR
             style={{
               position: "fixed",
               bottom: "20px",
@@ -168,17 +210,19 @@ const ImagePreviewWithModalAndPiP = ({ imageSrc }: Readonly<Props>) => {
             onClick={restoreModal}
             role="button"
           >
-            {/* Thumbnail of the image */}
-            <img
-              src={imageSrc}
-              alt="Minimized Preview"
-              style={{ width: "100%", height: "100%" }}
-            />
+            {/* Thumbnail of the image or text for minimized PDF */}
+            {typeof file !== "string" && file?.type.startsWith("image/") ? (
+              <img
+                src={URL.createObjectURL(file)}
+                alt="Minimized Preview"
+                style={{ width: "100%", height: "100%" }}
+              />
+            ) : (
+              <p>PDF</p>
+            )}
           </div>
         </Draggable>
       )}
     </div>
   );
-};
-
-export default ImagePreviewWithModalAndPiP;
+}
