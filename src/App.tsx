@@ -3,6 +3,10 @@ import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
 import "./App.css";
 import VideoPlayer from "./components/VideoPlayer";
+import ImagePreviewWithModalAndPiP from "./components/ImagePreview";
+
+const imageSrc =
+  "https://images.pexels.com/photos/1525041/pexels-photo-1525041.jpeg?cs=srgb&dl=pexels-francesco-ungaro-1525041.jpg&fm=jpg";
 
 function App() {
   const [count, setCount] = useState(0);
@@ -35,6 +39,9 @@ function App() {
         src="https://www.w3schools.com/html/mov_bbb.mp4"
         width="600"
       />
+
+      <h1>Image preview with modal and Pip</h1>
+      <ImagePreviewWithModalAndPiP imageSrc={imageSrc} />
     </>
   );
 }
